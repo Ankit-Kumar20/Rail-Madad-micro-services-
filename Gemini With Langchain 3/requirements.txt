@@ -13,3 +13,4 @@ arxiv
 pymupdf
 pandas
 langchain-Huggingface
+pypdf
