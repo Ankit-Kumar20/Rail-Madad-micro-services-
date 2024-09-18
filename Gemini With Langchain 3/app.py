@@ -38,13 +38,70 @@ if 'store' not in st.session_state:
     st.session_state.store ={}
 
 
-user_input = st.text_input("Your question:")
-uploaded_file = st.file_uploader("Choose an Image...", type=["jpg", "jpeg", "png"])
-
 def get_session_history(session:str)->BaseChatMessageHistory:
         if session_id not in st.session_state.store:
             st.session_state.store[session_id]=ChatMessageHistory()
         return st.session_state.store[session_id]
+
+def get_category(response):
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=500)
+    splits = text_splitter.split_text(response)
+    vectorstore = Chroma.from_texts(splits,embeddings)
+    retriever = vectorstore.as_retriever()
+
+    cat_prompt = (
+        "Assign it to one of the following categories."
+        "categories: 'Cleanliness and Hygiene', 'Ticketing Issues', 'Train Delay and Cancellations', 'Catering and Food Quality', 'Amenities and Facilities'"
+        "Give me the category to which the provided complaint belongs to."
+    )
+    cat_prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system",cat_prompt),
+                MessagesPlaceholder("chat_history"),
+                ("human","{input}")
+            ]
+        )
+    history_aware_retriever = create_history_aware_retriever(llm,retriever,cat_prompt)
+
+    system_prompt = (
+            "You are an AI assistant responsible for categorizing and responding to complaints related to their Train journey. Users may describe various issues, which need to be categorized"
+            "into one of the following: 'Cleanliness and Hygiene', 'Ticketing Issues', 'Train Delay and Cancellations', 'Catering and Food Quality', 'Amenities and Facilities', and 'Other" "Passenger Behavior'. Analyze the user's complaint, determine the most relevant category, and provide a concise response or acknowledgment of the issue. If the complaint does" "not fit any category, suggest that the user provide more details or select a different category."
+            "Give onw word answer"
+            "\n\n"
+            "{context}"
+        )
+    qa_prompt =ChatPromptTemplate.from_messages(
+            [
+                ("system",system_prompt),
+                MessagesPlaceholder("chat_history"),
+                ("human","{input}"), 
+            ]
+        )
+    question_answer_chain = create_stuff_documents_chain(llm,qa_prompt)
+    rag_chain = create_retrieval_chain(history_aware_retriever,question_answer_chain)
+
+    conversational_rag_chain = RunnableWithMessageHistory(
+            rag_chain,get_session_history,
+            input_messages_key="input",
+            history_messages_key="chat_history",
+            output_messages_key="answer"
+        )
+
+    session_history=get_session_history(session_id)
+    response_cat = conversational_rag_chain.invoke(
+        {"input":response},
+        config ={
+            "configurable":{"session_id":session_id}
+        }
+    )
+
+    return response_cat['answer']
+    #print(response_cat['answer'])
+
+
+user_input = st.text_input("Your question:")
+uploaded_file = st.file_uploader("Choose an Image...", type=["jpg", "jpeg", "png"])
+
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
@@ -58,12 +115,15 @@ if uploaded_file is not None:
     retriever = vectorstore.as_retriever()
 
     image_prompt=(
-            "Give a chat history and the latest user question"
-            "which might refernece context in the chat history,"
-            "formulate a standalone question whcih can be understood"
-            "without the chat history,Do NOT answer the question, "
-            "just reformulate it if needed and otherwise return it as is."
-        )
+        "describe the given image, effectively"
+        "You are an advanced AI assistant trained to interpret and describe images in a detailed, accurate, and contextually relevant manner. Your task is to provide clear and comprehensive descriptions of any image input, focusing on the following aspects:"
+        "Describing the setting, background, and overall composition of the image."
+        "Noting any prominent colors, textures, patterns, and lighting effects."
+        "Inferring the possible actions, emotions, or interactions visible in the image."
+        "Providing insights into the style, atmosphere, and any notable artistic or technical features."
+        "Always aim to be neutral and objective in your description, avoiding any assumptions that go beyond what is visually present. Keep the descriptions concise, yet detailed enough to give a clear mental image to someone who cannot see it."
+    )
+    
     image_prompt = ChatPromptTemplate.from_messages(
             [
                 ("system",image_prompt),
@@ -75,11 +135,9 @@ if uploaded_file is not None:
     history_aware_retriever = create_history_aware_retriever(llm,retriever,image_prompt)
 
     system_prompt = (
-            "You are an assistant for question-answering tasks."
-            "Use the following pieces of retrieved context to answer"
-            "the question. If you don't know the answer,say that you"
-            "don't know.Use three sentences maximum and keep the "
-            "answer concise"
+        "Analyze the image and classify the complaint into one of these categories: 'Cleanliness and Hygiene', 'Ticketing Issues', 'Train Delay and Cancellations', 'Catering and Food Quality', 'Amenities and Facilities', and 'Other" "Passenger Behavior'. "
+        "Give answer in 4 lines."
+        "always tell that your complaint has been routed to the respective department in the last line."
             "\n\n"
             "{context}"
         )
@@ -108,7 +166,7 @@ if uploaded_file is not None:
 
     session_history=get_session_history(session_id)
     response_img = conversational_rag_chain.invoke(
-        {"input":user_input},
+        {"input":response_img.text},
         config ={
             "configurable":{"session_id":session_id}
         }
@@ -116,6 +174,8 @@ if uploaded_file is not None:
     ##st.write(st.session_state.store)
     st.write("Assistant:",response_img['answer'])
     st.write("Chat History:",session_history.messages)
+    st.write("Category: ", get_category(response_img['answer']))
+
 
 if user_input is not None:
 
@@ -127,12 +187,11 @@ if user_input is not None:
         retriever = vectorstore.as_retriever()
  
         txt_prompt=(
-                "Give a chat history and the latest user question"
-                "which might refernece context in the chat history,"
-                "formulate a standalone question whcih can be understood"
-                "without the chat history,Do NOT answer the question, "
-                "just reformulate it if needed and otherwise return it as is."
-            )
+            "You have received a text-based complaint from a user. Carefully read the complaint and assign it to one of the "
+            "following categories: 'Cleanliness and Hygiene', 'Ticketing Issues', 'Train Delay and Cancellations', 'Catering and Food Quality', 'Amenities and Facilities', and 'Other" "Passenger Behavior'. After categorizing the complaint, provide a brief response acknowledging the issue and offering any next steps if relevant."
+            "formulate a standalone answer in hindi language which can be understood"
+        )
+
         txt_prompt = ChatPromptTemplate.from_messages(
                 [
                     ("system",txt_prompt),
@@ -144,11 +203,7 @@ if user_input is not None:
         history_aware_retriever = create_history_aware_retriever(llm,retriever,txt_prompt)
 
         system_prompt = (
-                "You are an assistant for question-answering tasks."
-                "Use the following pieces of retrieved context to answer"
-                "the question. If you don't know the answer,say that you"
-                "don't know.Use three sentences maximum and keep the "
-                "answer concise"
+                "You are an AI assistant responsible for categorizing and responding to complaints related to their Train journey. Users may describe various issues, which need to be categorized" "into one of the following: 'Cleanliness and Hygiene', 'Ticketing Issues', 'Train Delay and Cancellations', 'Catering and Food Quality', 'Amenities and Facilities', and 'Other" "Passenger Behavior'. Analyze the user's complaint, determine the most relevant category, and provide a concise response or acknowledgment of the issue. If the complaint does" "not fit any category, suggest that the user provide more details or select a different category."
                 "\n\n"
                 "{context}"
             )
@@ -185,5 +240,7 @@ if user_input is not None:
         ##st.write(st.session_state.store)
         st.write("Assistant:",response_txt['answer'])
         st.write("Chat History:",session_history.messages)
+        st.write("category: ",get_category(response_txt['answer']))
+
     except:
          st.write("")
