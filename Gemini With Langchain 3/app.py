@@ -27,7 +27,7 @@ genai.configure(api_key='AIzaSyB8XuTdGSDDGuCZa2fb1lvRbnNgoi2h9SU')
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
 ##setup Streamlit
-st.title("RAILMADADA-AI")
+st.title("RAILMADAD-AI")
 st.write("Upload image and give your complain here.")
 
 ##
