@@ -27,8 +27,8 @@ genai.configure(api_key='AIzaSyB8XuTdGSDDGuCZa2fb1lvRbnNgoi2h9SU')
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
 ##setup Streamlit
-st.title("conversational RAG With PDF uploads and chat history")
-st.write("Upload PDF's and Chat with thier content")
+st.title("RAILMADADA-AI")
+st.write("Upload image and give your complain here.")
 
 ##
 llm=ChatGoogleGenerativeAI(model="gemini-1.5-flash")
@@ -66,7 +66,7 @@ def get_category(response):
     system_prompt = (
             "You are an AI assistant responsible for categorizing and responding to complaints related to their Train journey. Users may describe various issues, which need to be categorized"
             "into one of the following: 'Cleanliness and Hygiene', 'Ticketing Issues', 'Train Delay and Cancellations', 'Catering and Food Quality', 'Amenities and Facilities', and 'Other" "Passenger Behavior'. Analyze the user's complaint, determine the most relevant category, and provide a concise response or acknowledgment of the issue. If the complaint does" "not fit any category, suggest that the user provide more details or select a different category."
-            "Give onw word answer"
+            "Give one word answer"
             "\n\n"
             "{context}"
         )
@@ -118,7 +118,6 @@ if uploaded_file is not None:
         "describe the given image, effectively"
         "You are an advanced AI assistant trained to interpret and describe images in a detailed, accurate, and contextually relevant manner. Your task is to provide clear and comprehensive descriptions of any image input, focusing on the following aspects:"
         "Describing the setting, background, and overall composition of the image."
-        "Noting any prominent colors, textures, patterns, and lighting effects."
         "Inferring the possible actions, emotions, or interactions visible in the image."
         "Providing insights into the style, atmosphere, and any notable artistic or technical features."
         "Always aim to be neutral and objective in your description, avoiding any assumptions that go beyond what is visually present. Keep the descriptions concise, yet detailed enough to give a clear mental image to someone who cannot see it."
@@ -137,7 +136,7 @@ if uploaded_file is not None:
     system_prompt = (
         "Analyze the image and classify the complaint into one of these categories: 'Cleanliness and Hygiene', 'Ticketing Issues', 'Train Delay and Cancellations', 'Catering and Food Quality', 'Amenities and Facilities', and 'Other" "Passenger Behavior'. "
         "Give answer in 4 lines."
-        "always tell that your complaint has been routed to the respective department in the last line."
+        "Always tell that your complaint has been routed to the respective department in the last line."
             "\n\n"
             "{context}"
         )
@@ -172,8 +171,8 @@ if uploaded_file is not None:
         }
     )
     ##st.write(st.session_state.store)
+    #st.write("Chat History:",session_history.messages)
     st.write("Assistant:",response_img['answer'])
-    st.write("Chat History:",session_history.messages)
     st.write("Category: ", get_category(response_img['answer']))
 
 
@@ -188,7 +187,8 @@ if user_input is not None:
  
         txt_prompt=(
             "You have received a text-based complaint from a user. Carefully read the complaint and assign it to one of the "
-            "following categories: 'Cleanliness and Hygiene', 'Ticketing Issues', 'Train Delay and Cancellations', 'Catering and Food Quality', 'Amenities and Facilities', and 'Other" "Passenger Behavior'. After categorizing the complaint, provide a brief response acknowledging the issue and offering any next steps if relevant."
+            "following categories: 'Cleanliness and Hygiene', 'Ticketing Issues', 'Train Delay and Cancellations', 'Catering and Food Quality', 'Amenities and Facilities', and 'Other" "Passenger Behavior'."
+            "After categorizing the complaint, provide a brief response acknowledging the issue."
             "formulate a standalone answer in hindi language which can be understood"
         )
 
@@ -239,7 +239,7 @@ if user_input is not None:
         )
         ##st.write(st.session_state.store)
         st.write("Assistant:",response_txt['answer'])
-        st.write("Chat History:",session_history.messages)
+        #st.write("Chat History:",session_history.messages)
         st.write("category: ",get_category(response_txt['answer']))
 
     except:
